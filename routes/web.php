@@ -1,0 +1,47 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\PageController;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// Trang chủ
+Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/collections/all', [ProductController::class, 'index'])->name('products.index');
+Route::view('/pages/about-us', 'pages.about')->name('about');
+Route::view('/pages/lien-he', 'pages.contact')->name('contact.page');
+Route::get('/pages/frontpage', [PageController::class, 'frontpage'])->name('page.frontpage');
+Route::get('/pages/cau-hoi-thuong-gap', [PageController::class, 'faq'])->name('page.faq');
+Route::get('/pages/chinh-sach-bao-mat', [PageController::class, 'privacyPolicy'])->name('page.privacy');
+Route::get('/pages/chinh-sach-bao-mat-thong-tin', [PageController::class, 'privacyInfo'])->name('page.privacy.info');
+Route::get('/pages/chinh-sach-doi-tra', [PageController::class, 'returnPolicy'])->name('page.return');
+Route::get('/pages/chinh-sach-giao-hang-va-thanh-toan', [PageController::class, 'shippingPaymentPolicy'])->name('page.shipping.payment');
+Route::get('/pages/dieu-khoan-dich-vu', [PageController::class, 'termsOfService'])->name('page.terms');
+Route::get('/pages/khach-hang-doanh-nghiep', [PageController::class, 'corporateCustomers'])->name('page.corporate');
+
+// Trang danh mục sản phẩm
+Route::get('/collections/{slug}/{tag}', [CategoryController::class, 'show'])->name('categories.show.tag');
+Route::get('/collections/{slug}', [CategoryController::class, 'show'])->name('categories.show');
+
+// Trang chi tiết sản phẩm
+Route::get('/products/{slug}', [ProductController::class, 'show'])->name('products.show');
+
+// Các trang khác (Giỏ hàng, Tìm kiếm...)
+Route::get('/cart', [CartController::class, 'index'])->name('cart');
+Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
+Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+Route::post('/cart/coupon', [CartController::class, 'applyCoupon'])->name('cart.coupon.apply');
+Route::post('/cart/coupon/remove', [CartController::class, 'removeCoupon'])->name('cart.coupon.remove');
+Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
+Route::post('/checkout/place-order', [CartController::class, 'placeOrder'])->name('checkout.place');
+Route::get('/checkout/thank-you/{code}', [CartController::class, 'thankYou'])->name('checkout.thankyou');
+Route::get('/search', [ProductController::class, 'search'])->name('search');
