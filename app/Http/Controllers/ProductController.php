@@ -36,25 +36,16 @@ class ProductController extends Controller
         }
 
         $relatedProducts = $this->productService->getRelatedProducts($product, 8);
-        $reviewSamples = [
-            [
-                'name' => 'Khach hang da mua',
-                'rating' => 5,
-                'content' => 'Trai cay tuoi, dong goi dep va giao dung hen. Se tiep tuc ung ho.',
-                'created_at' => '2 ngay truoc',
-            ],
-            [
-                'name' => 'Chi Thanh',
-                'rating' => 4,
-                'content' => 'San pham dung mo ta, qua dep. Ho tro doi mau qua nhanh khi can gap.',
-                'created_at' => '1 tuan truoc',
-            ],
-        ];
+        $optionProducts = $product->has_gear_detail
+            ? $this->productService->getOptionProducts($product, 8)
+            : collect([$product]);
+        $featuredProducts = $this->productService->getFeaturedProducts(5);
 
         return view('products.show', [
             'product' => $product,
             'relatedProducts' => $relatedProducts,
-            'reviewSamples' => $reviewSamples,
+            'optionProducts' => $optionProducts,
+            'featuredProducts' => $featuredProducts,
         ]);
     }
 

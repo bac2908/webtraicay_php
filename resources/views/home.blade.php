@@ -68,19 +68,19 @@
 	<div class="section_banner">
 		<div class="container">
 			<h2 class="hidden">Banner</h2>
-			<div class="banner-slider owl-carousel" data-lg-items='3' data-md-items='3' data-sm-items='2' data-xs-items="2" data-nav="true">
-				<div class="item">
-					<a href="#" class="clearfix">
+			<div class="row home-banner-row">
+				<div class="col-xs-12 col-sm-4 home-banner-col">
+					<a href="{{ route('categories.show', 'chuoi') }}" class="home-banner-item clearfix">
 						<img src="//theme.hstatic.net/200000157781/1001036201/14/banner1.jpg?v=1061" alt="Chuối ngon">
 					</a>
 				</div>
-				<div class="item">
-					<a href="#" class="clearfix">
+				<div class="col-xs-12 col-sm-4 home-banner-col">
+					<a href="{{ route('categories.show', 'vu-sua') }}" class="home-banner-item clearfix">
 						<img src="//theme.hstatic.net/200000157781/1001036201/14/banner2.jpg?v=1061" alt="Vú sữa Lò rèn">
 					</a>
 				</div>
-				<div class="item">
-					<a href="#" class="clearfix">
+				<div class="col-xs-12 col-sm-4 home-banner-col">
+					<a href="{{ route('products.show', 'sau-rieng-ri-6') }}" class="home-banner-item clearfix">
 						<img src="//theme.hstatic.net/200000157781/1001036201/14/banner3.jpg?v=1061" alt="Sầu riêng Ri6">
 					</a>
 				</div>
@@ -146,6 +146,7 @@
 
 {{-- Các Section Sản phẩm động --}}
 @foreach($sections as $index => $section)
+@continue($section['products']->isEmpty())
 <section class="awe-section-{{ $index + 4 }}" id="awe-section-{{ $index + 4 }}">
 	<div class="section section-deal products-view-grid">
 		<div class="container">
@@ -275,6 +276,37 @@
 /* Link hover state */
 .nav-category .nav-item:hover .nav-link {
     color: #8bc34a !important;
+}
+
+/* Home top 3 promo banners (match reference block under slider) */
+.home-banner-row {
+	margin-left: -8px;
+	margin-right: -8px;
+}
+
+.home-banner-col {
+	padding-left: 8px;
+	padding-right: 8px;
+	margin-bottom: 10px;
+}
+
+.home-banner-item {
+	display: block;
+	border-radius: 14px;
+	overflow: hidden;
+}
+
+.home-banner-item img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 14px;
+}
+
+@media (max-width: 767px) {
+	.home-banner-col {
+		width: 100%;
+	}
 }
 </style>
 @endsection

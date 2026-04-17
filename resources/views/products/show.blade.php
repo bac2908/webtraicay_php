@@ -1,526 +1,967 @@
 @extends('layouts.app')
 
+@php
+    $canonicalUrl = route('products.show', $product->slug);
+    $plainDescription = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($product->description ?? $product->short_desc ?? ''))));
+    $metaDescription = $plainDescription !== ''
+        ? \Illuminate\Support\Str::limit($plainDescription, 320, '')
+        : 'Thế Giới Trái Cây - Trái cây sạch, trái cây nhập khẩu chất lượng cao.';
+@endphp
+
 @section('title', $product->name . ' - Thế Giới Trái Cây')
+@section('canonical', $canonicalUrl)
+@section('meta_description', $metaDescription)
+
+@push('head_meta')
+    <meta property="og:type" content="product">
+    <meta property="og:title" content="{{ $product->name }}">
+    <meta property="og:description" content="{{ $metaDescription }}">
+    <meta property="og:url" content="{{ $canonicalUrl }}">
+    <meta property="og:image" content="{{ $product->primary_image_url }}">
+    <meta property="product:price:amount" content="{{ (int) ($product->sale_price && $product->sale_price < $product->price ? $product->sale_price : $product->price) }}">
+    <meta property="product:price:currency" content="VND">
+@endpush
 
 @section('content')
 @php
-    $galleryImages = collect([$product->thumb_url])
-        ->merge(
-            $product->images->map(function ($img) {
-                $url = trim((string) $img->url);
-                if ($url === '') {
-                    return null;
-                }
+    $resolvedImages = collect([$product->primary_image_url])
+        ->merge($product->images->pluck('url')->map(function ($url) {
+            if (!is_string($url) || $url === '') {
+                return null;
+            }
 
-                if (\Illuminate\Support\Str::startsWith($url, ['http://', 'https://', '//'])) {
-                    return $url;
-                }
+            if (\Illuminate\Support\Str::startsWith($url, ['http://', 'https://'])) {
+                return $url;
+            }
 
-                return asset(ltrim($url, '/'));
-            })
-        )
+            return asset(ltrim($url, '/'));
+        }))
         ->filter()
         ->unique()
         ->values();
 
-    if ($galleryImages->isEmpty()) {
-        $galleryImages = collect(['//theme.hstatic.net/200000157781/1001036201/14/no-image.jpg?v=1064']);
+    if ($resolvedImages->isEmpty()) {
+        $resolvedImages = collect(['//theme.hstatic.net/200000157781/1001036201/14/no-image.jpg?v=1064']);
     }
 
-    $thumbUrl = $galleryImages->first();
-    $displayPrice = $product->sale_price && $product->sale_price < $product->price
-        ? $product->sale_price
-        : $product->price;
+    $mainImage = (string) $resolvedImages->first();
+    $categoryName = optional($product->category)->name ?: 'Sản phẩm';
+    $categoryUrl = $product->category ? route('categories.show', $product->category->slug) : route('products.index');
 
-    $productDescription = trim((string) ($product->description ?? ''));
+    $basePrice = (int) ($product->price ?? 0);
+    $salePrice = (int) ($product->sale_price ?? 0);
+    $isSalePrice = $salePrice > 0 && $basePrice > 0 && $salePrice < $basePrice;
+    $displayPrice = $isSalePrice ? $salePrice : $basePrice;
+    $displayComparePrice = $isSalePrice ? $basePrice : null;
+    $discountPercent = ($isSalePrice && $basePrice > 0)
+        ? (int) round((($basePrice - $salePrice) / $basePrice) * 100)
+        : 0;
+    $isContactPrice = !$isSalePrice && $displayPrice <= 0;
+
+    $summaryText = trim((string) ($product->short_desc ?? ''));
+    if ($summaryText === '' && $plainDescription !== '') {
+        $summaryText = \Illuminate\Support\Str::limit($plainDescription, 300, '...');
+    }
+
+    $descriptionHtml = trim((string) ($product->description ?? ''));
+    if ($descriptionHtml === '') {
+        $descriptionHtml = $summaryText !== ''
+            ? '<p>' . e($summaryText) . '</p>'
+            : '<p>Thông tin sản phẩm đang được cập nhật.</p>';
+    }
+
+    $variantProducts = collect($optionProducts ?? [])->filter(function ($item) {
+        return $item && $item->id;
+    })->unique('id')->values();
+
+    if ($variantProducts->isEmpty()) {
+        $variantProducts = collect([$product]);
+    }
+
+    $hasVariantSelector = $variantProducts->count() > 1;
+
+    $featuredItems = collect($featuredProducts ?? [])->filter(function ($item) {
+        return $item && $item->id;
+    })->take(5);
+
+    $policyItems = [
+        [
+            'icon' => 'fa-shield',
+            'title' => 'Cam kết chất lượng',
+            'text' => 'Đổi trả nếu sản phẩm không đạt chất lượng hoặc không đúng mô tả.',
+        ],
+        [
+            'icon' => 'fa-truck',
+            'title' => 'Giao nhanh nội thành',
+            'text' => 'Hỗ trợ giao nhanh trong ngày tại TP.HCM với đội xe lạnh chuyên dụng.',
+        ],
+        [
+            'icon' => 'fa-gift',
+            'title' => 'Đóng gói chỉnh chu',
+            'text' => 'Phù hợp biếu tặng với đóng gói sạch đẹp, hạn chế dập nát khi vận chuyển.',
+        ],
+        [
+            'icon' => 'fa-percent',
+            'title' => 'Ưu đãi định kỳ',
+            'text' => 'Nhiều chương trình giá tốt theo mùa và mã giảm giá cho khách hàng thân thiết.',
+        ],
+    ];
 @endphp
 
-<section class="bread_crumb py-4">
+<section class="pdx-detail-page product product-template" itemscope itemtype="http://schema.org/Product">
+    <meta itemprop="name" content="{{ $product->name }}">
+    <meta itemprop="url" content="{{ $canonicalUrl }}">
+    <meta itemprop="image" content="{{ $mainImage }}">
+    <meta itemprop="description" content="{{ $metaDescription }}">
+
     <div class="container">
-        <ul class="breadcrumb">
-            <li class="home">
-                <a href="{{ route('home') }}">Trang chủ</a>
-                <span> <i class="fa fa-angle-right"></i> </span>
-            </li>
-            <li>
-                <a href="{{ route('products.index') }}">Tất cả sản phẩm</a>
-                <span> <i class="fa fa-angle-right"></i> </span>
-            </li>
-            <li><strong>{{ $product->name }}</strong></li>
-        </ul>
-    </div>
-</section>
-
-<section class="product-detail-wrap">
-    <div class="container">
-        <div class="product-detail-card">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="product-gallery">
-                        <div class="product-image-box">
-                            <img id="product-main-image" src="{{ $thumbUrl }}" alt="{{ $product->name }}">
-                        </div>
-                        @if($galleryImages->count() > 1)
-                            <div class="product-thumb-list">
-                                @foreach($galleryImages as $image)
-                                    <button type="button" class="product-thumb-btn {{ $loop->first ? 'is-active' : '' }}" data-image="{{ $image }}">
-                                        <img src="{{ $image }}" alt="{{ $product->name }} {{ $loop->iteration }}">
-                                    </button>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="product-meta">
-                        <h1 class="product-title">{{ $product->name }}</h1>
-                        <p class="product-sub">Đơn vị: {{ $product->unit ?? 'Sản phẩm' }}</p>
-                        <p class="product-sub">Tình trạng: {{ $product->stock > 0 ? 'Còn hàng' : 'Tạm hết hàng' }}</p>
-
-                        <div class="product-price-row">
-                            <span class="product-price-main">{{ number_format($displayPrice) }}₫</span>
-                            @if($product->sale_price && $product->sale_price < $product->price)
-                                <span class="product-price-old">{{ number_format($product->price) }}₫</span>
-                            @endif
-                        </div>
-
-                        @if(!empty($product->short_desc))
-                            <p class="product-short-desc">{{ $product->short_desc }}</p>
-                        @endif
-
-                        <form action="{{ route('cart.add') }}" method="post" class="buy-form-wrap">
-                            @csrf
-                            <input type="hidden" name="product_id" value="{{ $product->id }}">
-
-                            <div class="buy-qty-row">
-                                <label for="qty-input">Số lượng</label>
-                                <div class="qty-control">
-                                    <button type="button" class="qty-btn" data-action="minus">-</button>
-                                    <input id="qty-input" type="number" min="1" name="quantity" value="1">
-                                    <button type="button" class="qty-btn" data-action="plus">+</button>
-                                </div>
-                            </div>
-
-                            <div class="buy-action-row">
-                                <button type="submit" class="btn-add-cart">Thêm vào giỏ hàng</button>
-                                <button type="submit" name="checkout_redirect" value="1" class="btn-buy-now">Mua ngay</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="detail-tabs-wrap">
-                <div class="detail-tabs-head">
-                    <button class="detail-tab-btn is-active" type="button" data-tab="description">Mô tả sản phẩm</button>
-                    <button class="detail-tab-btn" type="button" data-tab="reviews">Đánh giá</button>
-                </div>
-
-                <div class="detail-tab-content is-active" id="tab-description">
-                    @if($productDescription !== '')
-                        {!! nl2br(e($productDescription)) !!}
-                    @elseif(!empty($product->short_desc))
-                        <p>{{ $product->short_desc }}</p>
-                    @else
-                        <p>Sản phẩm đang được cập nhật mô tả chi tiết. Vui lòng liên hệ để được tư vấn nhanh.</p>
-                    @endif
-                </div>
-
-                <div class="detail-tab-content" id="tab-reviews">
-                    <div class="review-list">
-                        @foreach($reviewSamples as $review)
-                            <article class="review-item">
-                                <div class="review-head">
-                                    <strong>{{ $review['name'] }}</strong>
-                                    <span>{{ $review['created_at'] }}</span>
-                                </div>
-                                <div class="review-stars">
-                                    @for($i = 1; $i <= 5; $i++)
-                                        <i class="fa fa-star {{ $i <= $review['rating'] ? 'is-on' : '' }}"></i>
-                                    @endfor
-                                </div>
-                                <p>{{ $review['content'] }}</p>
-                            </article>
-                        @endforeach
-                    </div>
-
-                    <div class="review-form-wrap">
-                        <h4>Gửi đánh giá của bạn</h4>
-                        <form action="javascript:void(0)">
-                            <div class="row">
-                                <div class="col-sm-6">
-                                    <input type="text" class="form-control" placeholder="Họ và tên">
-                                </div>
-                                <div class="col-sm-6">
-                                    <input type="email" class="form-control" placeholder="Email">
-                                </div>
-                            </div>
-                            <textarea class="form-control" rows="4" placeholder="Nội dung đánh giá"></textarea>
-                            <button type="button" class="btn-review-submit">Gửi đánh giá</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-@if(isset($relatedProducts) && $relatedProducts->isNotEmpty())
-<section class="related-products-wrap">
-    <div class="container">
-        <div class="section-title a-center title_line">
-            <h2><span>Sản phẩm liên quan</span></h2>
-        </div>
-
         <div class="row">
-            @foreach($relatedProducts as $related)
-                <div class="col-xs-6 col-sm-4 col-md-3">
-                    <x-products.card :product="$related" />
-                </div>
-            @endforeach
+            <div class="col-xs-12">
+                <ul class="breadcrumb pdx-breadcrumb">
+                    <li class="home">
+                        <a href="{{ route('home') }}"><span>Trang chủ</span></a>
+                        <span class="mr_lr"> / </span>
+                    </li>
+                    <li>
+                        <a href="{{ $categoryUrl }}"><span>{{ $categoryName }}</span></a>
+                        <span class="mr_lr"> / </span>
+                    </li>
+                    <li><strong><span>{{ $product->name }}</span></strong></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row pdx-layout">
+            <div class="col-xs-12 col-md-8">
+                <article class="pdx-main-card">
+                    <div class="row">
+                        <div class="col-xs-12 col-sm-6">
+                            <div class="pdx-gallery-wrap">
+                                <a href="{{ $mainImage }}" class="pdx-main-image-link" target="_blank" rel="noopener noreferrer">
+                                    <img id="pdx-main-image" src="{{ $mainImage }}" alt="{{ $product->name }}" class="pdx-main-image">
+                                </a>
+
+                                @if($resolvedImages->count() > 1)
+                                    <div class="pdx-thumb-grid" id="pdx-thumb-grid">
+                                        @foreach($resolvedImages as $imageUrl)
+                                            <button type="button" class="pdx-thumb {{ $loop->first ? 'is-active' : '' }}" data-image="{{ $imageUrl }}" aria-label="Xem ảnh {{ $loop->iteration }}">
+                                                <img src="{{ $imageUrl }}" alt="{{ $product->name }} - ảnh {{ $loop->iteration }}">
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="col-xs-12 col-sm-6">
+                            <div class="pdx-info-wrap">
+                                <a href="{{ $categoryUrl }}" class="pdx-category-chip">{{ $categoryName }}</a>
+                                <h1 class="pdx-title">{{ $product->name }}</h1>
+
+                                <div class="pdx-meta-line">
+                                    <span class="pdx-meta-stock {{ $product->stock > 0 ? 'is-available' : 'is-soldout' }}">
+                                        <i class="fa {{ $product->stock > 0 ? 'fa-check-circle' : 'fa-times-circle' }}" aria-hidden="true"></i>
+                                        {{ $product->stock > 0 ? 'Còn hàng' : 'Tạm hết hàng' }}
+                                    </span>
+                                    @if($product->sku)
+                                        <span class="pdx-meta-sku">SKU: {{ $product->sku }}</span>
+                                    @endif
+                                </div>
+
+                                <div class="pdx-price-line">
+                                    @if($isContactPrice)
+                                        <span class="pdx-price">Liên hệ</span>
+                                    @else
+                                        <span class="pdx-price">{{ number_format($displayPrice, 0, ',', '.') }}₫</span>
+                                        @if($displayComparePrice)
+                                            <span class="pdx-price-old">{{ number_format($displayComparePrice, 0, ',', '.') }}₫</span>
+                                        @endif
+                                        @if($discountPercent > 0)
+                                            <span class="pdx-price-badge">-{{ $discountPercent }}%</span>
+                                        @endif
+                                    @endif
+                                </div>
+
+                                @if($summaryText !== '')
+                                    <p class="pdx-summary">{{ $summaryText }}</p>
+                                @endif
+
+                                <form action="{{ route('cart.add') }}" method="post" class="pdx-buy-form" data-cart-form>
+                                    @csrf
+                                    <input type="hidden" name="product_id" value="{{ $product->id }}">
+
+                                    @if($hasVariantSelector)
+                                        <div class="pdx-field">
+                                            <label for="pdx-product-option">Chọn quy cách</label>
+                                            <select id="pdx-product-option" class="form-control">
+                                                @foreach($variantProducts as $variantProduct)
+                                                    @php
+                                                        $variantBase = (int) ($variantProduct->price ?? 0);
+                                                        $variantSale = (int) ($variantProduct->sale_price ?? 0);
+                                                        $variantCurrent = ($variantSale > 0 && $variantSale < $variantBase) ? $variantSale : $variantBase;
+                                                        $variantLabel = trim((string) ($variantProduct->unit ?: $variantProduct->name));
+                                                    @endphp
+                                                    <option value="{{ route('products.show', $variantProduct->slug) }}" {{ $variantProduct->id === $product->id ? 'selected' : '' }}>
+                                                        {{ $variantLabel }} - {{ $variantCurrent > 0 ? number_format($variantCurrent, 0, ',', '.') . '₫' : 'Liên hệ' }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
+
+                                    <div class="pdx-qty-row">
+                                        <label for="pdx-qty">Số lượng</label>
+                                        <div class="pdx-qty-control">
+                                            <button type="button" class="pdx-qty-btn" data-action="minus" aria-label="Giảm số lượng">-</button>
+                                            <input id="pdx-qty" class="pdx-qty-input" type="text" name="quantity" value="1" maxlength="3">
+                                            <button type="button" class="pdx-qty-btn" data-action="plus" aria-label="Tăng số lượng">+</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="pdx-actions">
+                                        <button type="submit" class="pdx-btn pdx-btn-primary">
+                                            <i class="fa fa-shopping-bag" aria-hidden="true"></i>
+                                            Thêm vào giỏ
+                                        </button>
+                                        <button type="submit" name="checkout_redirect" value="1" class="pdx-btn pdx-btn-secondary">
+                                            Mua nhanh
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div class="pdx-share-line">
+                                    <span>Chia sẻ:</span>
+                                    <a rel="nofollow" target="_blank" href="https://www.facebook.com/sharer.php?u={{ urlencode($canonicalUrl) }}" title="Facebook">Facebook</a>
+                                    <a rel="nofollow" target="_blank" href="https://twitter.com/share?url={{ urlencode($canonicalUrl) }}" title="Twitter">Twitter</a>
+                                    <a rel="nofollow" target="_blank" href="https://pinterest.com/pin/create/button/?url={{ urlencode($canonicalUrl) }}&media={{ urlencode($mainImage) }}" title="Pinterest">Pinterest</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="pdx-tabs-card">
+                    <div class="pdx-tabs-nav">
+                        <button type="button" class="pdx-tab-btn is-active" data-tab-target="description">Mô tả sản phẩm</button>
+                        <button type="button" class="pdx-tab-btn" data-tab-target="delivery">Giao hàng & dịch vụ</button>
+                    </div>
+
+                    <div class="pdx-tab-panel is-active" data-tab-panel="description">
+                        <div class="pdx-description-content">
+                            {!! $descriptionHtml !!}
+                        </div>
+                    </div>
+
+                    <div class="pdx-tab-panel" data-tab-panel="delivery">
+                        <ul class="pdx-delivery-list">
+                            @foreach($policyItems as $policy)
+                                <li>
+                                    <span class="pdx-delivery-icon"><i class="fa {{ $policy['icon'] }}" aria-hidden="true"></i></span>
+                                    <div>
+                                        <strong>{{ $policy['title'] }}</strong>
+                                        <p>{{ $policy['text'] }}</p>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-xs-12 col-md-4">
+                <aside class="pdx-side-card pdx-policy-card">
+                    <h2 class="pdx-side-title">Cam kết từ Thế Giới Trái Cây</h2>
+                    @foreach($policyItems as $policy)
+                        <div class="pdx-policy-item">
+                            <span class="pdx-policy-icon"><i class="fa {{ $policy['icon'] }}" aria-hidden="true"></i></span>
+                            <div class="pdx-policy-content">
+                                <h3>{{ $policy['title'] }}</h3>
+                                <p>{{ $policy['text'] }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                </aside>
+
+                @if($featuredItems->isNotEmpty())
+                    <aside class="pdx-side-card pdx-featured-card">
+                        <h2 class="pdx-side-title">Sản phẩm nổi bật</h2>
+                        <div class="pdx-featured-list">
+                            @foreach($featuredItems as $featured)
+                                @php
+                                    $featuredPrice = (int) ($featured->price ?? 0);
+                                    $featuredSale = (int) ($featured->sale_price ?? 0);
+                                    $featuredCurrent = ($featuredSale > 0 && $featuredSale < $featuredPrice) ? $featuredSale : $featuredPrice;
+                                    $featuredOld = ($featuredSale > 0 && $featuredSale < $featuredPrice) ? $featuredPrice : null;
+                                @endphp
+                                <a class="pdx-featured-item" href="{{ route('products.show', $featured->slug) }}" title="{{ $featured->name }}">
+                                    <img src="{{ $featured->primary_image_url }}" alt="{{ $featured->name }}" loading="lazy">
+                                    <div class="pdx-featured-info">
+                                        <h3>{{ $featured->name }}</h3>
+                                        <div class="pdx-featured-price">
+                                            @if($featuredCurrent > 0)
+                                                <span class="current">{{ number_format($featuredCurrent, 0, ',', '.') }}₫</span>
+                                            @else
+                                                <span class="current">Liên hệ</span>
+                                            @endif
+
+                                            @if($featuredOld)
+                                                <span class="old">{{ number_format($featuredOld, 0, ',', '.') }}₫</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    </aside>
+                @endif
+            </div>
         </div>
     </div>
 </section>
+
+@if($relatedProducts->isNotEmpty())
+    <section class="pdx-related-section">
+        <div class="container">
+            <div class="row">
+                <div class="col-xs-12">
+                    <h2 class="pdx-related-title">Sản phẩm liên quan</h2>
+                </div>
+            </div>
+            <div class="row row-fix">
+                @foreach($relatedProducts as $relatedProduct)
+                    <div class="col-xs-6 col-sm-4 col-md-3 col-fix">
+                        <x-products.card :product="$relatedProduct" />
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
 @endif
 @endsection
 
 @push('styles')
 <style>
-    .product-detail-wrap {
-        margin-block-end: 26px;
+.pdx-detail-page {
+    padding: 8px 0 36px;
+}
+
+.pdx-breadcrumb {
+    margin-bottom: 14px;
+}
+
+.pdx-layout {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.pdx-main-card,
+.pdx-tabs-card,
+.pdx-side-card {
+    background: #fff;
+    border: 1px solid #e9e9e9;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(23, 44, 30, 0.05);
+}
+
+.pdx-main-card {
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.pdx-gallery-wrap {
+    margin-bottom: 12px;
+}
+
+.pdx-main-image-link {
+    display: block;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #ececec;
+    background: #fff;
+}
+
+.pdx-main-image {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+}
+
+.pdx-thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.pdx-thumb {
+    border: 1px solid #ececec;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.pdx-thumb img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
+}
+
+.pdx-thumb.is-active,
+.pdx-thumb:hover {
+    border-color: #8bc34a;
+    transform: translateY(-1px);
+}
+
+.pdx-info-wrap {
+    padding-left: 4px;
+}
+
+.pdx-category-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid #dce9d2;
+    background: #f5fbf0;
+    color: #628f2e !important;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.pdx-title {
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.28;
+    color: #1f1f1f;
+}
+
+.pdx-meta-line {
+    margin: 10px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.pdx-meta-stock,
+.pdx-meta-sku {
+    font-size: 13px;
+    color: #555;
+}
+
+.pdx-meta-stock i {
+    margin-right: 5px;
+}
+
+.pdx-meta-stock.is-available {
+    color: #2d8f4a;
+    font-weight: 600;
+}
+
+.pdx-meta-stock.is-soldout {
+    color: #c24938;
+    font-weight: 600;
+}
+
+.pdx-price-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pdx-price {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    color: #f7941d;
+}
+
+.pdx-price-old {
+    font-size: 18px;
+    color: #888;
+    text-decoration: line-through;
+}
+
+.pdx-price-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: #ffefdf;
+    color: #d26c00;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+}
+
+.pdx-summary {
+    margin: 0 0 14px;
+    color: #555;
+    line-height: 1.75;
+}
+
+.pdx-buy-form {
+    border-top: 1px dashed #e7e7e7;
+    padding-top: 12px;
+}
+
+.pdx-field {
+    margin-bottom: 12px;
+}
+
+.pdx-field label {
+    display: inline-block;
+    margin-bottom: 5px;
+    color: #333;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.pdx-field .form-control {
+    height: 40px;
+    border-color: #e4e4e4;
+    border-radius: 8px;
+}
+
+.pdx-qty-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.pdx-qty-row label {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.pdx-qty-control {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #e4e4e4;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 40px;
+}
+
+.pdx-qty-btn {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    background: #f7f7f7;
+    color: #333;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.pdx-qty-input {
+    width: 58px;
+    height: 40px;
+    border: 0;
+    border-left: 1px solid #e4e4e4;
+    border-right: 1px solid #e4e4e4;
+    text-align: center;
+    font-size: 14px;
+}
+
+.pdx-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pdx-btn {
+    border: 0;
+    border-radius: 8px;
+    height: 42px;
+    min-width: 160px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: all 0.2s ease;
+}
+
+.pdx-btn:hover {
+    transform: translateY(-1px);
+}
+
+.pdx-btn-primary {
+    background: #8bc34a;
+    color: #fff;
+}
+
+.pdx-btn-primary:hover {
+    background: #79ad3f;
+    color: #fff;
+}
+
+.pdx-btn-secondary {
+    background: #f3f3f3;
+    color: #333;
+}
+
+.pdx-btn-secondary:hover {
+    background: #e8e8e8;
+    color: #222;
+}
+
+.pdx-share-line {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed #e8e8e8;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: #666;
+    font-size: 13px;
+}
+
+.pdx-share-line a {
+    color: #1e73be;
+    font-weight: 500;
+}
+
+.pdx-tabs-card {
+    padding: 16px;
+}
+
+.pdx-tabs-nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pdx-tab-btn {
+    border: 1px solid #e5e5e5;
+    border-radius: 999px;
+    background: #fff;
+    color: #555;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+}
+
+.pdx-tab-btn.is-active {
+    border-color: #8bc34a;
+    background: #8bc34a;
+    color: #fff;
+}
+
+.pdx-tab-panel {
+    display: none;
+}
+
+.pdx-tab-panel.is-active {
+    display: block;
+}
+
+.pdx-description-content {
+    color: #3f3f3f;
+    line-height: 1.8;
+}
+
+.pdx-description-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.pdx-delivery-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+}
+
+.pdx-delivery-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border: 1px solid #ededed;
+    border-radius: 10px;
+    background: #fbfbfb;
+    padding: 10px;
+}
+
+.pdx-delivery-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ecf7df;
+    color: #65952f;
+    flex: 0 0 30px;
+}
+
+.pdx-delivery-list strong {
+    display: block;
+    margin-bottom: 3px;
+    color: #2f2f2f;
+    font-size: 14px;
+}
+
+.pdx-delivery-list p {
+    margin: 0;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.pdx-side-card {
+    padding: 14px;
+    margin-bottom: 14px;
+}
+
+.pdx-side-title {
+    margin: 0 0 12px;
+    color: #2a2a2a;
+    font-size: 20px;
+    line-height: 1.35;
+}
+
+.pdx-policy-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 0;
+    border-bottom: 1px dashed #ececec;
+}
+
+.pdx-policy-item:last-child {
+    border-bottom: 0;
+}
+
+.pdx-policy-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #eff8e6;
+    color: #6f9f36;
+    flex: 0 0 30px;
+}
+
+.pdx-policy-content h3 {
+    margin: 0 0 3px;
+    color: #2f2f2f;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.pdx-policy-content p {
+    margin: 0;
+    color: #5a5a5a;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.pdx-featured-list {
+    display: grid;
+    gap: 10px;
+}
+
+.pdx-featured-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid #ededed;
+    border-radius: 10px;
+    background: #fff;
+    padding: 7px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pdx-featured-item:hover {
+    border-color: #d8eac8;
+    box-shadow: 0 6px 16px rgba(23, 44, 30, 0.08);
+}
+
+.pdx-featured-item img {
+    width: 62px;
+    height: 62px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex: 0 0 62px;
+}
+
+.pdx-featured-info h3 {
+    margin: 0 0 3px;
+    color: #303030;
+    font-size: 13px;
+    line-height: 1.45;
+    max-height: 37px;
+    overflow: hidden;
+}
+
+.pdx-featured-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.pdx-featured-price .current {
+    color: #f7941d;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.pdx-featured-price .old {
+    color: #929292;
+    font-size: 12px;
+    text-decoration: line-through;
+}
+
+.pdx-related-section {
+    margin: 0 0 46px;
+}
+
+.pdx-related-title {
+    margin: 0 0 12px;
+    color: #2a2a2a;
+    font-size: 30px;
+}
+
+@media (max-width: 1199px) {
+    .pdx-title {
+        font-size: 26px;
     }
 
-    .product-detail-card {
-        background: #fff;
-        border: 1px solid #ececec;
-        border-radius: 12px;
-        padding: 22px;
+    .pdx-price {
+        font-size: 32px;
     }
 
-    .product-image-box {
-        border: 1px solid #eee;
-        border-radius: 10px;
-        padding: 12px;
-        background: #fff;
-    }
-
-    .product-image-box img {
-        inline-size: 100%;
-        block-size: auto;
-        border-radius: 8px;
-        display: block;
-    }
-
-    .product-thumb-list {
-        margin-block-start: 12px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
-    .product-thumb-btn {
-        border: 1px solid #e6e6e6;
-        border-radius: 8px;
-        padding: 4px;
-        background: #fff;
-        inline-size: 70px;
-        block-size: 70px;
-        cursor: pointer;
-    }
-
-    .product-thumb-btn img {
-        inline-size: 100%;
-        block-size: 100%;
-        object-fit: cover;
-        border-radius: 6px;
-    }
-
-    .product-thumb-btn.is-active {
-        border-color: #7fbe3b;
-    }
-
-    .product-meta {
-        padding-inline-start: 8px;
-    }
-
-    .product-title {
-        margin: 0 0 10px;
-        font-size: 30px;
-        font-weight: 700;
-        color: #242424;
-    }
-
-    .product-sub {
-        margin: 0 0 6px;
-        font-size: 14px;
-        color: #666;
-    }
-
-    .product-price-row {
-        margin: 14px 0;
-        display: flex;
-        align-items: flex-end;
-        gap: 10px;
-    }
-
-    .product-price-main {
-        color: #ff9800;
-        font-size: 34px;
-        line-height: 1;
-        font-weight: 700;
-    }
-
-    .product-price-old {
-        color: #9ca3af;
-        text-decoration: line-through;
-        font-size: 20px;
-    }
-
-    .product-short-desc {
-        color: #4f4f4f;
-        line-height: 1.8;
-    }
-
-    .buy-form-wrap {
-        margin-block-start: 18px;
-        border-block-start: 1px dashed #e5e5e5;
-        padding-block-start: 16px;
-    }
-
-    .buy-qty-row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-block-end: 14px;
-    }
-
-    .buy-qty-row label {
-        margin: 0;
-        font-weight: 600;
-        color: #333;
-    }
-
-    .qty-control {
-        display: inline-flex;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        overflow: hidden;
-        block-size: 40px;
-    }
-
-    .qty-btn {
-        inline-size: 40px;
-        border: 0;
-        background: #f8f8f8;
-        font-size: 20px;
-        color: #444;
-    }
-
-    .qty-control input {
-        inline-size: 58px;
-        border: 0;
-        text-align: center;
-        font-size: 15px;
-    }
-
-    .buy-action-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .btn-add-cart,
-    .btn-buy-now {
-        min-inline-size: 180px;
-        block-size: 42px;
-        border-radius: 999px;
-        border: 0;
-        padding: 0 16px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: #fff;
-        text-decoration: none !important;
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    .btn-add-cart {
-        background: #7fbe3b;
-    }
-
-    .btn-buy-now {
-        background: #f7941e;
-    }
-
-    .btn-add-cart:hover,
-    .btn-buy-now:hover {
-        color: #fff;
-        opacity: .92;
-    }
-
-    .detail-tabs-wrap {
-        margin-block-start: 20px;
-        border-block-start: 1px solid #eee;
-        padding-block-start: 16px;
-    }
-
-    .detail-tabs-head {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-block-end: 14px;
-    }
-
-    .detail-tab-btn {
-        border: 1px solid #ddd;
-        background: #fff;
-        border-radius: 999px;
-        padding: 8px 14px;
-        color: #555;
-        font-size: 14px;
-    }
-
-    .detail-tab-btn.is-active {
-        border-color: #7fbe3b;
-        background: #7fbe3b;
-        color: #fff;
-    }
-
-    .detail-tab-content {
-        display: none;
-        color: #4f4f4f;
-        line-height: 1.8;
-    }
-
-    .detail-tab-content.is-active {
-        display: block;
-    }
-
-    .review-list {
-        display: grid;
-        gap: 10px;
-    }
-
-    .review-item {
-        border: 1px solid #ededed;
-        border-radius: 10px;
-        padding: 12px;
-        background: #fcfcfc;
-    }
-
-    .review-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        margin-block-end: 6px;
-        color: #333;
-    }
-
-    .review-stars {
-        margin-block-end: 6px;
-    }
-
-    .review-stars .fa {
-        color: #d7d7d7;
-    }
-
-    .review-stars .fa.is-on {
-        color: #f8b300;
-    }
-
-    .review-item p {
-        margin: 0;
-    }
-
-    .review-form-wrap {
-        margin-block-start: 14px;
-        border-block-start: 1px dashed #e4e4e4;
-        padding-block-start: 12px;
-    }
-
-    .review-form-wrap h4 {
+    .pdx-side-title {
         font-size: 18px;
-        margin: 0 0 10px;
+    }
+}
+
+@media (max-width: 991px) {
+    .pdx-main-card,
+    .pdx-tabs-card,
+    .pdx-side-card {
+        border-radius: 12px;
     }
 
-    .review-form-wrap .form-control {
-        margin-block-end: 10px;
-        border-radius: 8px;
-        min-block-size: 38px;
+    .pdx-main-card {
+        padding: 12px;
     }
 
-    .btn-review-submit {
-        block-size: 38px;
-        border: 0;
-        border-radius: 999px;
-        background: #7fbe3b;
-        color: #fff;
-        padding: 0 16px;
+    .pdx-info-wrap {
+        padding-left: 0;
+        margin-top: 12px;
     }
 
-    .related-products-wrap {
-        margin-block-end: 42px;
+    .pdx-price {
+        font-size: 30px;
     }
 
-    @media (max-inline-size: 991px) {
-        .product-meta {
-            padding-inline-start: 0;
-            margin-block-start: 16px;
-        }
-
-        .product-title {
-            font-size: 24px;
-        }
-
-        .product-price-main {
-            font-size: 30px;
-        }
+    .pdx-related-title {
+        font-size: 26px;
     }
+}
+
+@media (max-width: 767px) {
+    .pdx-detail-page {
+        padding-top: 4px;
+    }
+
+    .pdx-title {
+        font-size: 24px;
+    }
+
+    .pdx-thumb-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .pdx-qty-row {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .pdx-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .pdx-btn {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .pdx-share-line {
+        gap: 8px;
+    }
+
+    .pdx-side-title {
+        font-size: 17px;
+    }
+
+    .pdx-related-title {
+        font-size: 22px;
+    }
+}
 </style>
 @endpush
 
 @push('scripts')
 <script>
-    (function () {
-        var mainImage = document.getElementById('product-main-image');
-        var thumbButtons = document.querySelectorAll('.product-thumb-btn');
-        var qtyInput = document.getElementById('qty-input');
-        var qtyButtons = document.querySelectorAll('.qty-btn');
-        var tabButtons = document.querySelectorAll('.detail-tab-btn');
-        var tabContents = {
-            description: document.getElementById('tab-description'),
-            reviews: document.getElementById('tab-reviews')
-        };
+document.addEventListener('DOMContentLoaded', function () {
+    var mainImage = document.getElementById('pdx-main-image');
+    var mainImageLink = document.querySelector('.pdx-main-image-link');
+    var thumbButtons = document.querySelectorAll('#pdx-thumb-grid .pdx-thumb');
 
-        thumbButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var img = btn.getAttribute('data-image');
-                if (mainImage && img) {
-                    mainImage.setAttribute('src', img);
-                }
+    thumbButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            var nextImage = button.getAttribute('data-image');
+            if (!nextImage || !mainImage) {
+                return;
+            }
 
-                thumbButtons.forEach(function (item) {
-                    item.classList.remove('is-active');
-                });
-                btn.classList.add('is-active');
+            mainImage.setAttribute('src', nextImage);
+            if (mainImageLink) {
+                mainImageLink.setAttribute('href', nextImage);
+            }
+
+            thumbButtons.forEach(function (item) {
+                item.classList.remove('is-active');
             });
+            button.classList.add('is-active');
         });
+    });
 
-        qtyButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                if (!qtyInput) {
-                    return;
-                }
+    var qtyInput = document.getElementById('pdx-qty');
+    var qtyButtons = document.querySelectorAll('.pdx-qty-btn');
 
-                var current = parseInt(qtyInput.value || '1', 10);
-                if (Number.isNaN(current) || current < 1) {
-                    current = 1;
-                }
+    if (qtyInput && qtyButtons.length) {
+        qtyButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                var action = button.getAttribute('data-action');
+                var current = parseInt(qtyInput.value, 10) || 1;
 
-                if (btn.getAttribute('data-action') === 'plus') {
-                    qtyInput.value = current + 1;
+                if (action === 'plus') {
+                    qtyInput.value = Math.min(999, current + 1);
                     return;
                 }
 
@@ -528,23 +969,52 @@
             });
         });
 
-        tabButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var tab = btn.getAttribute('data-tab');
-                if (!tab || !tabContents[tab]) {
-                    return;
-                }
+        qtyInput.addEventListener('input', function () {
+            var value = parseInt(qtyInput.value, 10);
 
-                tabButtons.forEach(function (item) {
-                    item.classList.remove('is-active');
-                });
-                btn.classList.add('is-active');
+            if (Number.isNaN(value) || value < 1) {
+                value = 1;
+            }
 
-                Object.keys(tabContents).forEach(function (key) {
-                    tabContents[key].classList.toggle('is-active', key === tab);
-                });
+            if (value > 999) {
+                value = 999;
+            }
+
+            qtyInput.value = value;
+        });
+    }
+
+    var variantSelect = document.getElementById('pdx-product-option');
+    if (variantSelect) {
+        variantSelect.addEventListener('change', function () {
+            var targetUrl = variantSelect.value;
+            if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+        });
+    }
+
+    var tabButtons = document.querySelectorAll('.pdx-tab-btn');
+    var tabPanels = document.querySelectorAll('.pdx-tab-panel');
+
+    tabButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            var target = button.getAttribute('data-tab-target');
+            if (!target) {
+                return;
+            }
+
+            tabButtons.forEach(function (item) {
+                item.classList.remove('is-active');
+            });
+            button.classList.add('is-active');
+
+            tabPanels.forEach(function (panel) {
+                var panelTarget = panel.getAttribute('data-tab-panel');
+                panel.classList.toggle('is-active', panelTarget === target);
             });
         });
-    })();
+    });
+});
 </script>
 @endpush

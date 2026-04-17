@@ -52,7 +52,7 @@
 					<div class="collection-tag-filters">
 						<a href="{{ route('categories.show', $category->slug) }}" class="collection-tag-btn {{ empty($selectedTag) ? 'is-active' : '' }}">Tất cả</a>
 						@foreach($childTags as $tagItem)
-							<a href="{{ route('categories.show.tag', ['slug' => $category->slug, 'tag' => $tagItem->name]) }}" class="collection-tag-btn {{ (!empty($selectedTag) && strcasecmp($selectedTag, $tagItem->name) === 0) ? 'is-active' : '' }}">{{ $tagItem->name }}</a>
+							<a href="{{ route('categories.show.tag', ['slug' => $category->slug, 'tag' => $tagItem->name]) }}" class="collection-tag-btn {{ (!empty($selectedTag) && \Illuminate\Support\Str::slug($selectedTag) === \Illuminate\Support\Str::slug($tagItem->name)) ? 'is-active' : '' }}">{{ $tagItem->name }}</a>
 						@endforeach
 					</div>
 				@endif
@@ -121,68 +121,8 @@
 					<div class="row">
 						@if($products->count() > 0)
 							@foreach($products as $product)
-								@php
-									$thumbUrl = $product->thumb_url;
-								@endphp
 								<div class="col-xs-6 col-xss-6 col-sm-4 col-md-4 col-lg-4">
-									<!-- Product Card -->
-									<div class="product-box">
-										<div class="product-thumbnail flexbox-grid">
-											<a href="{{ route('products.show', $product->slug) }}" title="{{ $product->name }}">
-												<img src="{{ $thumbUrl }}"
-													 data-lazyload="{{ $thumbUrl }}"
-													 alt="{{ $product->name }}">
-											</a>
-
-											<!-- Sales Flash Badge -->
-											@if($product->sale_price && $product->sale_price < $product->price)
-												@php
-													$discount = round((($product->price - $product->sale_price) / $product->price) * 100);
-												@endphp
-												<div class="sale-flash"><div class="before"></div>- {{ $discount }}%</div>
-											@endif
-
-											<!-- Action Buttons -->
-											<div class="product-action hidden-md hidden-sm hidden-xs clearfix">
-												<form action="{{ route('cart.add') }}" method="post" class="variants form-nut-grid margin-bottom-0" enctype="multipart/form-data">
-													<div>
-														@csrf
-														<input type="hidden" name="product_id" value="{{ $product->id }}" />
-														<input type="hidden" name="quantity" value="1" />
-														<button class="btn-buy btn-cart btn btn-primary left-to add_to_cart" data-toggle="tooltip" title="Đặt hàng">
-															<i class="fa fa-shopping-bag"></i>
-														</button>
-														<a href="{{ route('products.show', $product->slug) }}" data-toggle="tooltip" title="Xem nhanh" class="btn-gray btn_view btn right-to quick-view">
-															<i class="fa fa-eye"></i>
-														</a>
-													</div>
-												</form>
-											</div>
-										</div>
-										<div class="product-info a-center">
-											<h3 class="product-name">
-												<a href="{{ route('products.show', $product->slug) }}" title="{{ $product->name }}">
-													{{ $product->name }}
-												</a>
-											</h3>
-
-											<!-- Price Box -->
-											<div class="price-box clearfix">
-												@if($product->sale_price)
-													<div class="special-price">
-														<span class="price product-price">{{ number_format($product->sale_price) }}₫</span>
-													</div>
-													<div class="old-price">
-														<span class="price product-price-old">{{ number_format($product->price) }}₫</span>
-													</div>
-												@else
-													<div class="special-price">
-														<span class="price product-price">{{ number_format($product->price) }}₫</span>
-													</div>
-												@endif
-											</div>
-										</div>
-									</div>
+									<x-products.card :product="$product" />
 								</div>
 							@endforeach
 						@else
@@ -300,6 +240,10 @@
 							<h2 class="title-head margin-top-0"><span>Giá sản phẩm</span></h2>
 						</div>
 						<div class="aside-content filter-group">
+							<div class="filter-search">
+								<input type="text" onkeyup="filterItemInList(this)">
+								<i class="fa fa-search"></i>
+							</div>
 							<ul>
 								<li class="filter-item filter-item--check-box filter-item--green">
 									<span>
@@ -377,6 +321,71 @@
 				</div>
 			</div>
 
+			<!-- Type Filter -->
+			<div class="aside-filter">
+				<div class="filter-container">
+					<aside class="aside-item filter-type">
+						<div class="aside-title">
+							<h2 class="title-head margin-top-0"><span>Loại</span></h2>
+						</div>
+						<div class="aside-content filter-group filter-type-group">
+							<div class="filter-search">
+								<input type="text" onkeyup="filterItemInList(this)">
+								<i class="fa fa-search"></i>
+							</div>
+
+							@php
+								$availableRootSlugs = collect($allCategories ?? [])->filter(function ($item) {
+									return (int) ($item->parent_id ?? 0) === 0 && (!isset($item->is_active) || (bool) $item->is_active);
+								})->pluck('slug')->values()->all();
+
+								$sidebarTypeItems = collect([
+									['label' => 'Trái cây nhập khẩu', 'slug' => 'trai-cay-nhap-khau'],
+									['label' => 'Trái Cây Việt Nam', 'slug' => 'trai-cay-viet-nam'],
+									['label' => 'Giỏ quà và Set quà', 'slug' => 'gio-qua-va-set-qua'],
+									['label' => 'Thực phẩm', 'slug' => 'thuc-pham'],
+									['label' => 'Trái cây Thái lan', 'slug' => 'trai-cay-thai-lan'],
+									['label' => 'Quả cưới và Mâm cúng', 'slug' => 'qua-cuoi-va-mam-cung'],
+									['label' => 'Kem và Bánh nhập khẩu', 'slug' => null],
+									['label' => 'Khác', 'slug' => null],
+									['label' => 'Combo siêu tiết kiệm', 'slug' => 'combo-sieu-tiet-kiem'],
+								])->map(function ($item) use ($availableRootSlugs) {
+									$slug = $item['slug'];
+									$item['target_url'] = ($slug && in_array($slug, $availableRootSlugs, true))
+										? route('categories.show', $slug)
+										: route('products.index');
+
+									return $item;
+								});
+							@endphp
+
+							<ul class="filter-type-list">
+								@foreach($sidebarTypeItems as $typeItem)
+									@php
+										$typeInputId = 'filter-type-' . ($typeItem['slug'] ?: \Illuminate\Support\Str::slug($typeItem['label']));
+										$isCurrentType = isset($category) && !empty($typeItem['slug']) && $category->slug === $typeItem['slug'];
+									@endphp
+									<li class="filter-item filter-item--check-box filter-item--green">
+										<span>
+											<label for="{{ $typeInputId }}">
+												<input type="checkbox"
+												       id="{{ $typeInputId }}"
+												       data-target-url="{{ $typeItem['target_url'] }}"
+												       data-fallback-url="{{ route('products.index') }}"
+												       onchange="applyTypeNavigation(this)"
+												       {{ $isCurrentType ? 'checked' : '' }}>
+												<i class="fa"></i>
+												{{ $typeItem['label'] }}
+											</label>
+										</span>
+									</li>
+								@endforeach
+							</ul>
+						</div>
+					</aside>
+				</div>
+			</div>
+
 			<!-- Featured Products -->
 			<div class="aside-item aside-mini-list-product mb-5">
 				<div>
@@ -391,10 +400,12 @@
 								@foreach($featuredProducts as $fp)
 									@php
 										$featuredThumbUrl = $fp->thumb_url;
+										$featuredSale = $fp->sale_price && $fp->sale_price > 0 && $fp->sale_price < $fp->price;
+										$featuredContact = !$featuredSale && (int) $fp->price <= 0;
 									@endphp
 									<div class="row row-noGutter">
 										<div class="col-sm-12">
-											<div class="product-mini-item clearfix on-sale">
+											<div class="product-mini-item clearfix {{ $featuredSale ? 'on-sale' : '' }}">
 												<div class="product-img relative">
 													<a href="{{ route('products.show', $fp->slug) }}">
 														<img src="{{ $featuredThumbUrl }}" alt="{{ $fp->name }}" style="width: 100%; height: 100%; object-fit: cover;">
@@ -407,7 +418,9 @@
 														</a>
 													</h3>
 													<div class="price-box">
-														@if($fp->sale_price)
+														@if($featuredContact)
+															<span class="special-price"><span class="price product-price">Liên hệ</span></span>
+														@elseif($featuredSale)
 															<span class="price"><span class="price product-price">{{ number_format($fp->sale_price) }}₫</span></span>
 															<span class="old-price"><del class="sale-price">{{ number_format($fp->price) }}₫</del></span>
 														@else
@@ -439,6 +452,32 @@ function applyFilter(checkbox, filterType, filterValue) {
 	}
 
 	window.location.href = url.toString();
+}
+
+function applyTypeNavigation(checkbox, targetUrl, fallbackUrl) {
+	var nextUrl = targetUrl || checkbox.getAttribute('data-target-url');
+	var resetUrl = fallbackUrl || checkbox.getAttribute('data-fallback-url');
+
+	if (!nextUrl || !resetUrl) {
+		return;
+	}
+
+	window.location.href = checkbox.checked ? nextUrl : resetUrl;
+}
+
+function filterItemInList(inputElement) {
+	var query = (inputElement.value || '').toLowerCase().trim();
+	var filterGroup = inputElement.closest('.filter-group');
+
+	if (!filterGroup) {
+		return;
+	}
+
+	var items = filterGroup.querySelectorAll('ul .filter-item');
+	items.forEach(function (item) {
+		var text = (item.textContent || '').toLowerCase();
+		item.style.display = text.indexOf(query) >= 0 ? '' : 'none';
+	});
 }
 </script>
 
@@ -550,6 +589,77 @@ function applyFilter(checkbox, filterType, filterValue) {
 		background: #7fbe3b;
 		border-color: #7fbe3b;
 		color: #fff;
+	}
+
+	.aside-filter .filter-search {
+		position: relative;
+		margin-bottom: 10px;
+	}
+
+	.aside-filter .filter-search input {
+		width: 100%;
+		height: 34px;
+		border: 1px solid #ececec;
+		border-radius: 2px;
+		padding: 0 34px 0 10px;
+		font-size: 13px;
+		outline: none;
+	}
+
+	.aside-filter .filter-search .fa {
+		position: absolute;
+		right: 10px;
+		top: 50%;
+		transform: translateY(-50%);
+		color: #333;
+		font-size: 16px;
+	}
+
+	.aside-filter .filter-group {
+		padding: 10px;
+	}
+
+	.aside-filter .filter-group > ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.aside-filter .filter-group .filter-item {
+		margin-bottom: 6px;
+	}
+
+	.aside-filter .filter-group .filter-item:last-child {
+		margin-bottom: 0;
+	}
+
+	.aside-filter .filter-group label {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 14px;
+		font-weight: 500;
+		color: #444;
+		line-height: 1.6;
+		cursor: pointer;
+	}
+
+	.aside-filter .filter-group label input[type="checkbox"] {
+		margin: 0;
+	}
+
+	.filter-type .filter-type-group {
+		padding: 10px;
+	}
+
+	.filter-type .filter-type-list {
+		max-height: 230px;
+		overflow-y: auto;
+		padding-right: 4px;
+	}
+
+	.filter-type .filter-type-list .filter-item {
+		margin-bottom: 6px;
 	}
 
 	.product-pagination-list {

@@ -12,7 +12,13 @@ class ProductService
 {
     public function getCollection(Request $request)
     {
-        $query = Product::query()->where('is_active', true);
+        $query = Product::query()
+            ->with([
+                'images' => function ($q) {
+                    $q->orderBy('sort_order');
+                },
+            ])
+            ->where('is_active', true);
 
         // Filter by Category
         if ($request->has('category')) {
@@ -23,16 +29,13 @@ class ProductService
                 ->first();
 
             if ($category) {
-                $categoryIds = [$category->id];
-                $childrenIds = Category::query()
-                    ->where('parent_id', $category->id)
-                    ->where('is_active', true)
+                $categoryIds = $category->descendants()
                     ->pluck('id')
+                    ->push($category->id)
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
                     ->all();
-
-                if (!empty($childrenIds)) {
-                    $categoryIds = array_merge($categoryIds, $childrenIds);
-                }
 
                 $query->whereIn('category_id', array_values(array_unique($categoryIds)));
 
@@ -45,15 +48,48 @@ class ProductService
                         ->where('parent_id', $category->id)
                         ->where('is_active', true)
                         ->where(function ($q) use ($tagSlug, $decodedTag) {
-                            $q->where('slug', $tagSlug)
-                              ->orWhere('name', 'like', '%' . $decodedTag . '%');
+                                                        $q->where('name', 'like', '%' . $decodedTag . '%');
+
+                                                        if ($tagSlug !== '') {
+                                                                $q->orWhere('slug', $tagSlug)
+                                                                    ->orWhere('slug', 'like', '%' . $tagSlug . '%');
+                                                        }
                         })
                         ->first();
 
                     if ($tagCategory) {
-                        $query->where('category_id', $tagCategory->id);
+                        $tagCategoryIds = $tagCategory->descendants()
+                            ->pluck('id')
+                            ->push($tagCategory->id)
+                            ->map(fn ($id) => (int) $id)
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        $hasTaggedProducts = Product::query()
+                            ->where('is_active', true)
+                            ->whereIn('category_id', array_values(array_unique($tagCategoryIds)))
+                            ->exists();
+
+                        if ($hasTaggedProducts) {
+                            $query->whereIn('category_id', array_values(array_unique($tagCategoryIds)));
+                        } else {
+                            $query->where(function ($q) use ($decodedTag, $tagSlug) {
+                                $q->where('name', 'like', '%' . $decodedTag . '%');
+
+                                if ($tagSlug !== '') {
+                                    $q->orWhere('slug', 'like', '%' . $tagSlug . '%');
+                                }
+                            });
+                        }
                     } else {
-                        $query->where('name', 'like', '%' . $decodedTag . '%');
+                        $query->where(function ($q) use ($decodedTag, $tagSlug) {
+                            $q->where('name', 'like', '%' . $decodedTag . '%');
+
+                            if ($tagSlug !== '') {
+                                $q->orWhere('slug', 'like', '%' . $tagSlug . '%');
+                            }
+                        });
                     }
                 }
             }
@@ -166,5 +202,55 @@ class ProductService
             ->orderByDesc('id')
             ->limit($limit)
             ->get();
+    }
+
+    public function getOptionProducts(Product $product, int $limit = 8)
+    {
+        $baseName = $this->normalizeProductBaseName($product->name);
+
+        if ($baseName === '') {
+            return collect([$product]);
+        }
+
+        $query = Product::query()
+            ->where('is_active', true)
+            ->where('id', '!=', $product->id);
+
+        if ($product->category_id) {
+            $query->where('category_id', $product->category_id);
+        }
+
+        $slugNeedle = Str::slug($baseName);
+
+        $query->where(function ($q) use ($baseName, $slugNeedle) {
+            $q->where('name', 'like', '%' . $baseName . '%');
+
+            if ($slugNeedle !== '') {
+                $q->orWhere('slug', 'like', $slugNeedle . '%');
+            }
+        });
+
+        $options = $query
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+
+        return collect([$product])
+            ->concat($options)
+            ->unique('id')
+            ->values();
+    }
+
+    private function normalizeProductBaseName(string $name): string
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        $baseName = trim((string) preg_replace('/\s*-\s*[^-]+$/u', '', $name));
+
+        return $baseName !== '' ? $baseName : $name;
     }
 }

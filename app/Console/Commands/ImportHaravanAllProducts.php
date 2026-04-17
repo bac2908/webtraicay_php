@@ -79,21 +79,31 @@ class ImportHaravanAllProducts extends Command
             $this->line('Found products: ' . count($items));
 
             foreach ($items as $p) {
-                Product::query()->updateOrCreate(
-                    ['slug' => $p['slug']],
-                    [
-                        'name' => $p['name'],
-                        'category_id' => null,
-                        'unit' => $p['unit'],
-                        'stock' => 100,
-                        'price' => $p['price'] ?? 0,
-                        'sale_price' => $p['sale_price'],
-                        'thumb' => $p['thumb'],
-                        'short_desc' => null,
-                        'description' => null,
-                        'is_active' => true,
-                    ]
-                );
+                $product = Product::query()->withTrashed()->firstOrNew([
+                    'slug' => $p['slug'],
+                ]);
+
+                if ($product->exists && $product->trashed()) {
+                    $product->restore();
+                }
+
+                $product->name = $p['name'];
+
+                // Keep existing category_id intact. New records remain uncategorized until sync command maps them.
+                if (!$product->exists && !$product->category_id) {
+                    $product->category_id = null;
+                }
+
+                $product->unit = $p['unit'];
+                $product->stock = 100;
+                $product->price = $p['price'] ?? 0;
+                $product->sale_price = $p['sale_price'];
+                $product->thumb = $p['thumb'];
+                $product->short_desc = null;
+                $product->description = null;
+                $product->is_active = true;
+                $product->has_gear_detail = $p['has_gear_detail'] ?? false;
+                $product->save();
 
                 $totalUpserted++;
             }
@@ -152,7 +162,7 @@ class ImportHaravanAllProducts extends Command
     /**
      * Parse product cards on /collections/all page.
      *
-     * @return array<int, array{name:string,slug:string,unit:?string,thumb:?string,price:?int,sale_price:?int}>
+      * @return array<int, array{name:string,slug:string,unit:?string,thumb:?string,price:?int,sale_price:?int,has_gear_detail:bool}>
      */
     private function parseProductsFromCollectionHtml(string $html, string $base): array
     {
@@ -165,7 +175,7 @@ class ImportHaravanAllProducts extends Command
         foreach ($cards as $card) {
             $a = $xpath->query(".//h3[contains(concat(' ', normalize-space(@class), ' '), ' product-name ')]//a", $card)->item(0)
                 ?? $xpath->query(".//a[@href and contains(@href, '/products/')]", $card)->item(0);
-            if (!$a) {
+            if (!$a || !($a instanceof \DOMElement)) {
                 continue;
             }
 
@@ -185,7 +195,7 @@ class ImportHaravanAllProducts extends Command
 
             $img = $xpath->query(".//img", $card)->item(0);
             $thumb = null;
-            if ($img) {
+            if ($img instanceof \DOMElement) {
                 $thumb = $img->getAttribute('data-lazyload') ?: $img->getAttribute('src');
                 $thumb = $this->normalizeAssetUrl($thumb, $base);
             }
@@ -210,6 +220,7 @@ class ImportHaravanAllProducts extends Command
                 $unit = trim(Str::afterLast($name, ' - '));
             }
 
+            $hasGearDetail = $this->detectGearDetailFromCard($xpath, $card);
             $out[] = [
                 'name' => $name,
                 'slug' => $slug,
@@ -217,6 +228,7 @@ class ImportHaravanAllProducts extends Command
                 'thumb' => $thumb,
                 'price' => $basePrice,
                 'sale_price' => $salePrice,
+                'has_gear_detail' => $hasGearDetail,
             ];
         }
 
@@ -253,5 +265,25 @@ class ImportHaravanAllProducts extends Command
         if (Str::startsWith($u, '//')) return 'https:' . $u;
         if (Str::startsWith($u, '/')) return $base . $u;
         return $u;
+    }
+
+    private function detectGearDetailFromCard(\DOMXPath $xpath, \DOMNode $card): bool
+    {
+        $actionNode = $xpath->query(".//*[contains(concat(' ', normalize-space(@class), ' '), ' product-action ')]", $card)->item(0);
+
+        if (!$actionNode || !($actionNode instanceof \DOMElement) || !$actionNode->ownerDocument) {
+            return false;
+        }
+
+        $actionHtml = (string) $actionNode->ownerDocument->saveHTML($actionNode);
+        $normalized = mb_strtolower((string) preg_replace('/\s+/u', ' ', trim($actionHtml)), 'UTF-8');
+
+        return Str::contains($normalized, [
+            'fa-gear',
+            'name="variantid"',
+            'title="chọn sản phẩm"',
+            'title="chon san pham"',
+            'onclick="window.location.href=',
+        ]);
     }
 }

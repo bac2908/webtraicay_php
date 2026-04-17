@@ -27,6 +27,37 @@ Route::get('/pages/chinh-sach-giao-hang-va-thanh-toan', [PageController::class, 
 Route::get('/pages/dieu-khoan-dich-vu', [PageController::class, 'termsOfService'])->name('page.terms');
 Route::get('/pages/khach-hang-doanh-nghiep', [PageController::class, 'corporateCustomers'])->name('page.corporate');
 
+// Admin FE-first routes (UI only, BE data wiring in the next phase)
+Route::prefix('admin')->name('admin.')->group(function () {
+	Route::get('/', function () {
+		return view('admin.dashboard');
+	})->name('dashboard');
+
+	Route::get('/products', function () {
+		return view('admin.products');
+	})->name('products');
+
+	Route::get('/orders', function () {
+		return view('admin.orders');
+	})->name('orders');
+
+	Route::get('/customers', function () {
+		return view('admin.customers');
+	})->name('customers');
+
+	Route::get('/coupons', function () {
+		return view('admin.coupons');
+	})->name('coupons');
+
+	Route::get('/reports', function () {
+		return view('admin.reports');
+	})->name('reports');
+
+	Route::get('/settings', function () {
+		return view('admin.settings');
+	})->name('settings');
+});
+
 // Trang danh mục sản phẩm
 Route::get('/collections/{slug}/{tag}', [CategoryController::class, 'show'])->name('categories.show.tag');
 Route::get('/collections/{slug}', [CategoryController::class, 'show'])->name('categories.show');

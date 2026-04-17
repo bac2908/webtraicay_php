@@ -25,6 +25,7 @@ class Product extends Model
         'short_desc',
         'description',
         'is_active',
+        'has_gear_detail',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class Product extends Model
         'price' => 'integer',
         'sale_price' => 'integer',
         'stock' => 'integer',
+        'has_gear_detail' => 'boolean',
     ];
 
     public function category(): BelongsTo
@@ -102,11 +104,35 @@ class Product extends Model
             return '//theme.hstatic.net/200000157781/1001036201/14/no-image.jpg?v=1064';
         }
 
-        if (Str::startsWith($thumb, ['http://', 'https://', '//'])) {
-            return $thumb;
+        return $this->resolveMediaUrl($thumb);
+    }
+
+    public function getPrimaryImageUrlAttribute(): string
+    {
+        $imageUrl = '';
+
+        if ($this->relationLoaded('images')) {
+            $imageUrl = trim((string) optional($this->images->first())->url);
+        } else {
+            $imageUrl = trim((string) $this->images()->value('url'));
         }
 
-        $path = ltrim($thumb, '/');
+        if ($imageUrl !== '') {
+            return $this->resolveMediaUrl($imageUrl);
+        }
+
+        return $this->thumb_url;
+    }
+
+    private function resolveMediaUrl(string $rawPath): string
+    {
+        $rawPath = trim($rawPath);
+
+        if (Str::startsWith($rawPath, ['http://', 'https://', '//'])) {
+            return $rawPath;
+        }
+
+        $path = ltrim($rawPath, '/');
         $rootUrl = rtrim((string) url('/'), '/');
 
         // When the app is opened through server.php, asset() can generate server.php/images/... URLs.

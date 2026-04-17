@@ -4,8 +4,9 @@
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 	<title>@yield('title', 'Thế Giới Trái Cây - Trái cây Việt Nam loại 1 & nhập khẩu cao cấp')</title>
+	<meta name="description" content="@yield('meta_description', 'The Gioi Trai Cay - Trai cay Viet Nam loai 1 va nhap khau chat luong cao.')">
 
-	<link rel="canonical" href="https://thegioitraicay.net/" />
+	<link rel="canonical" href="@yield('canonical', url()->current())" />
 	<meta name="robots" content="index,follow" />
 	<meta name="revisit-after" content="1 day" />
 	<meta http-equiv="x-ua-compatible" content="ie=edge">
@@ -27,6 +28,7 @@
 	<link href='//theme.hstatic.net/200000157781/1001036201/14/style-theme.scss.css?v=1061' rel='stylesheet' type='text/css'  media='all'  />
 	<link href='//theme.hstatic.net/200000157781/1001036201/14/responsive-update.scss.css?v=1061' rel='stylesheet' type='text/css'  media='all'  />
 	<link href='//theme.hstatic.net/200000157781/1001036201/14/hrv-style.css?v=1061' rel='stylesheet' type='text/css'  media='all'  />
+	@stack('head_meta')
 
 	@yield('styles')
 </head>
@@ -145,11 +147,14 @@
 										@foreach(($megaCategories ?? collect()) as $category)
 										<li class="level1 parent item">
 											<h2 class="h4"><a href="{{ route('categories.show', $category->slug) }}"><span>{{ $category->name }}</span></a></h2>
-											@if($category->children->isNotEmpty())
+											@php
+												$megaItems = collect($category->mega_items ?? []);
+											@endphp
+											@if($megaItems->isNotEmpty())
 											<ul class="level1">
-												@foreach($category->children as $child)
+												@foreach($megaItems as $menuItem)
 												<li class="level2">
-													<a href="{{ route('categories.show', $child->slug) }}"><span>{{ $child->name }}</span></a>
+														<a href="{{ $menuItem['url'] }}"><span>{{ $menuItem['label'] }}</span></a>
 												</li>
 												@endforeach
 											</ul>
@@ -161,7 +166,7 @@
 							</div>
 						</div>
 					</li>
-				<li class="nav-item"><a class="nav-link" href="{{ url('/collections/mam-dia-ngu-qua') }}">Mâm dĩa ngũ quả</a></li>
+				<li class="nav-item {{ request()->is('collections/mam-dia-ngu-qua') ? 'active' : '' }}"><a class="nav-link" href="{{ url('/collections/mam-dia-ngu-qua') }}">Mâm dĩa ngũ quả</a></li>
 				<li class="nav-item {{ request()->routeIs('about') ? 'active' : '' }}"><a class="nav-link" href="{{ route('about') }}">Giới thiệu</a></li>
 				<li class="nav-item {{ request()->routeIs('contact.page') ? 'active' : '' }}"><a class="nav-link" href="{{ route('contact.page') }}">Liên hệ</a></li>
 				</ul>
@@ -317,6 +322,116 @@
 		nav .nav-left > .nav-item.active > .nav-link { background: #ff9800 !important; }
 		nav .nav-left > .nav-item:hover > .nav-link { background: rgba(0,0,0,0.05); }
 
+		nav .nav-left > .nav-item.has-mega {
+			position: relative;
+		}
+
+		nav .nav-left > .nav-item.has-mega .mega-content {
+			left: 0 !important;
+			right: auto !important;
+			width: min(1120px, calc(100vw - 32px)) !important;
+			max-width: calc(100vw - 32px) !important;
+			padding: 14px 18px 18px !important;
+			border: 1px solid #ececec;
+			background: #fff;
+			box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+			z-index: 1002;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level0-wrapper2,
+		nav .nav-left > .nav-item.has-mega .nav-block,
+		nav .nav-left > .nav-item.has-mega .nav-block.nav-block-center {
+			width: 100% !important;
+			max-width: 100% !important;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level0 {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(180px, 1fr));
+			gap: 24px;
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+			float: none !important;
+			width: auto !important;
+			min-width: 0;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > h2 {
+			margin: 0 0 10px;
+			font-size: 16px;
+			line-height: 1.2;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > h2 a {
+			color: #1f1f1f !important;
+			text-decoration: none !important;
+			font-weight: 700;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > h2 a span {
+			display: block;
+			white-space: nowrap;
+			overflow: visible;
+			text-overflow: clip;
+			max-width: none;
+			word-break: keep-all;
+			overflow-wrap: normal;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 > li.level2 {
+			margin: 0 0 10px;
+			padding: 0;
+			float: none !important;
+			width: auto !important;
+			min-width: 0;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 > li.level2:last-child {
+			margin-bottom: 0;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 > li.level2 a {
+			color: #333 !important;
+			font-size: 14px;
+			line-height: 1.25;
+			font-weight: 500;
+			text-decoration: none !important;
+			white-space: nowrap;
+			overflow: visible;
+			text-overflow: clip;
+			display: block;
+			max-width: none;
+			word-break: keep-all;
+			overflow-wrap: normal;
+		}
+
+		nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 > li.level2 a:hover {
+			color: #7fbe3b !important;
+		}
+
+		@media (max-width: 1399px) {
+			nav .nav-left > .nav-item.has-mega .level1.parent.item > h2 {
+				font-size: 15px;
+			}
+
+			nav .nav-left > .nav-item.has-mega .level1.parent.item > ul.level1 > li.level2 a {
+				font-size: 13px;
+			}
+		}
+
 		/* Search */
 		.menu-search { padding: 8px 0; }
 		.header_search form { background: #fff; border-radius: 25px; height: 34px; padding: 0 15px; width: 250px; display: flex; align-items: center; }
@@ -346,116 +461,440 @@
 
 		.product-action { display: none; position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; }
 		.product-box:hover .product-action { display: block; }
-		.btn-cart, .btn_view { background: #8bc34a; color: #fff; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+		.btn-cart, .btn_view, .product-detail-link { background: #8bc34a; color: #fff; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin: 0 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
 
 		.sale-flash { position: absolute; top: 10px; left: 10px; background: #ff9800; color: #fff; padding: 2px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; z-index: 5; }
 
 		/* Coupons */
 		.coupon-item__inner { border: 1px dashed #8bc34a; display: flex; padding: 15px; border-radius: 8px; background: #f9fff0; margin-bottom: 15px; }
 
-		/* Footer Styles */
-		.footer { background: #fdfdfd; margin-top: 50px; padding-top: 50px; border-top: 1px solid #eee; }
-		.footer-widget h3 { color: #333; font-size: 16px; font-weight: 700; margin-bottom: 20px; text-transform: uppercase; }
-		.list-menu { list-style: none; padding: 0; }
-		.list-menu li { margin-bottom: 10px; color: #666; font-size: 14px; }
-		.list-menu li i { color: #8bc34a; margin-right: 10px; }
-		.copyright { background: #8bc34a; color: #fff; padding: 15px 0; margin-top: 30px; }
+		/* Footer Replica (thegioitraicay.net style) */
+		.section_brand.section,
+		.section.section-brand {
+			display: none !important;
+		}
+
+		.tgc-brand-strip {
+			background: #fff;
+			padding: 22px 0 18px;
+			border-top: 1px solid #efefef;
+		}
+
+		.tgc-brand-grid {
+			display: grid;
+			grid-template-columns: repeat(6, minmax(90px, 1fr));
+			gap: 24px;
+			align-items: center;
+		}
+
+		.tgc-brand-item {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 72px;
+		}
+
+		.tgc-brand-item img {
+			max-width: 100%;
+			max-height: 68px;
+			object-fit: contain;
+			filter: saturate(0.95);
+		}
+
+		.footer {
+			background: #679a24;
+			color: #fff;
+			margin-top: 0;
+			padding-top: 0;
+			border-top: 0;
+		}
+
+		.footer .site-footer {
+			background: #679a24;
+		}
+
+		.footer .footer-inner {
+			padding: 36px 0 28px;
+		}
+
+		.footer .footer-widget {
+			margin-bottom: 18px;
+		}
+
+		.footer .footer-widget h3 {
+			color: #fff;
+			font-size: 16px;
+			font-weight: 700;
+			line-height: 1.45;
+			margin: 0 0 10px;
+			text-transform: uppercase;
+		}
+
+		.footer .list-menu {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+		}
+
+		.footer .list-menu li {
+			margin-bottom: 0;
+			padding: 3px 0;
+			color: #fff;
+			font-size: 15px;
+			line-height: 1.7;
+		}
+
+		.footer .list-menu li a {
+			color: #fff !important;
+			text-decoration: none;
+		}
+
+		.footer .list-menu li a:hover {
+			opacity: 0.85;
+		}
+
+		.footer .footer-contact-list li {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+		}
+
+		.footer .footer-contact-list li i {
+			color: #ff9f0e;
+			font-size: 16px;
+			margin-top: 6px;
+			min-width: 20px;
+		}
+
+		.footer .footer-contact-list .line-break {
+			display: block;
+			margin-left: 0;
+		}
+
+		.footer .menu-dot li {
+			padding-left: 16px;
+			position: relative;
+		}
+
+		.footer .menu-dot li::before {
+			content: '';
+			position: absolute;
+			left: 0;
+			top: 12px;
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: #fff;
+		}
+
+		.footer .footer-connect {
+			min-height: 118px;
+			display: flex;
+			align-items: center;
+			gap: 16px;
+		}
+
+		.footer .footer-connect .divider {
+			width: 1px;
+			height: 68px;
+			background: rgba(255, 255, 255, 0.55);
+		}
+
+		.footer .footer-connect .connect-label {
+			font-size: 16px;
+			font-style: italic;
+			font-weight: 500;
+			color: #fff;
+			text-decoration: none;
+		}
+
+		.footer .footer-connect .connect-label:hover {
+			opacity: 0.85;
+		}
+
+		.footer .copyright {
+			background: rgba(0, 0, 0, 0.2);
+			color: #fff;
+			padding: 10px 0;
+			margin-top: 0;
+			position: relative;
+		}
+
+		.footer .copyright .copyright-text {
+			font-size: 15px;
+			font-weight: 600;
+		}
+
+		.footer .copyright .list-menu-footer {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+			display: flex;
+			justify-content: flex-end;
+			gap: 0;
+		}
+
+		.footer .copyright .list-menu-footer li {
+			display: inline-block;
+			padding: 0 10px;
+		}
+
+		.footer .copyright .list-menu-footer li a {
+			color: #fff !important;
+			font-size: 15px;
+			font-weight: 400;
+			text-decoration: none;
+		}
+
+		.footer .back-to-top {
+			position: fixed;
+			right: 14px;
+			bottom: 16px;
+			width: 54px;
+			height: 46px;
+			background: #7bb337;
+			color: #fff;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 20px;
+			cursor: pointer;
+			border-radius: 2px;
+			z-index: 9998;
+			box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+			transform: translateY(10px);
+			transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+		}
+
+		.footer .back-to-top.is-visible {
+			opacity: 1;
+			visibility: visible;
+			pointer-events: auto;
+			transform: translateY(0);
+		}
+
+		.tgc-side-icons {
+			position: fixed;
+			right: 14px;
+			top: 50%;
+			transform: translateY(-50%);
+			z-index: 9999;
+			display: flex;
+			flex-direction: column;
+			gap: 14px;
+			opacity: 0;
+			visibility: hidden;
+			pointer-events: none;
+			transform: translateY(calc(-50% + 12px));
+			transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s ease;
+		}
+
+		.tgc-side-icons.is-visible {
+			opacity: 1;
+			visibility: visible;
+			pointer-events: auto;
+			transform: translateY(-50%);
+		}
+
+		.tgc-side-icons .icon-item {
+			width: 54px;
+			height: 54px;
+			border-radius: 50%;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			color: #fff !important;
+			text-decoration: none !important;
+			box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+			font-size: 23px;
+		}
+
+		.tgc-side-icons .icon-item.phone { background: #ea2f2f; }
+		.tgc-side-icons .icon-item.zalo { background: #2f83ff; font-size: 15px; font-weight: 700; letter-spacing: 0.2px; }
+		.tgc-side-icons .icon-item.youtube { background: #ff1b1b; font-size: 20px; }
+		.tgc-side-icons .icon-item.instagram {
+			background: linear-gradient(145deg, #f9ce34, #ee2a7b, #6228d7);
+		}
+		.tgc-side-icons .icon-item.tiktok { background: #000; }
+		.tgc-side-icons .icon-item.location { background: #f2ae16; }
+		.tgc-side-icons .icon-item.messenger { background: #22a8ff; }
+
+		@media (max-width: 1399px) {
+			.footer .footer-inner { padding: 34px 0 26px; }
+		}
+
+		@media (max-width: 1199px) {
+			.tgc-brand-grid {
+				grid-template-columns: repeat(4, minmax(90px, 1fr));
+				gap: 18px;
+			}
+
+			.footer .footer-widget h3 { font-size: 15px; margin-bottom: 8px; }
+			.footer .list-menu li { font-size: 14px; }
+			.footer .footer-connect .connect-label { font-size: 15px; }
+		}
+
+		@media (max-width: 991px) {
+			.tgc-brand-strip {
+				padding: 18px 0 16px;
+			}
+
+			.tgc-brand-grid {
+				grid-template-columns: repeat(3, minmax(80px, 1fr));
+				gap: 14px;
+			}
+
+			.footer .footer-inner {
+				padding: 28px 0 22px;
+			}
+
+			.footer .footer-widget h3 { font-size: 15px; }
+			.footer .list-menu li { font-size: 14px; }
+			.footer .footer-connect { min-height: 84px; gap: 14px; }
+			.footer .footer-connect .divider { height: 58px; }
+			.footer .footer-connect .connect-label { font-size: 15px; }
+			.footer .copyright .list-menu-footer {
+				justify-content: flex-start;
+				gap: 16px;
+				flex-wrap: wrap;
+				margin-top: 8px;
+			}
+
+			.footer .back-to-top {
+				display: none;
+			}
+		}
+
+		@media (max-width: 767px) {
+			.tgc-side-icons { display: none; }
+			.footer .footer-widget { margin-bottom: 18px; }
+			.footer .list-menu li { font-size: 14px; }
+			.footer .footer-contact-list .line-break { margin-left: 0; }
+			.footer .footer-contact-list li {
+				align-items: flex-start;
+			}
+		}
 	</style>
 
 	@stack('styles')
 
+	<section class="tgc-brand-strip">
+		<div class="container">
+			<div class="tgc-brand-grid">
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand1.png?v=1064" alt="Envy"></div>
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand2.png?v=1064" alt="Koala Cherries"></div>
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand3.png?v=1064" alt="Sun World"></div>
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand4.png?v=1064" alt="Pretty Lady"></div>
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand5.png?v=1064" alt="Zespri"></div>
+				<div class="tgc-brand-item"><img src="//theme.hstatic.net/200000157781/1001036201/14/brand6.png?v=1064" alt="Sunkist"></div>
+			</div>
+		</div>
+	</section>
+
 	<footer class="footer">
 		<div class="site-footer">
 			<div class="container">
-				<div class="footer-inner padding-top-50 padding-bottom-30">
+				<div class="footer-inner">
 					<div class="row">
-						<div class="col-xs-12 col-sm-6 col-md-4 col-lg-4">
+						<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
 							<div class="footer-widget">
-							<h3 class="h3_footer text-uppercase">Liên hệ</h3>
-							<ul class="list-menu">
-								<li><i class="fa fa-map-marker"></i> 338 Hai Bà Trưng, P. Tân Định, Q.1, HCM</li>
-									<li><i class="fa fa-phone"></i> 0909131418 - 0798531637</li>
-									<li><i class="fa fa-envelope"></i> thegioitraicay.net@gmail.com</li>
+								<h3>Liên hệ</h3>
+								<ul class="list-menu footer-contact-list">
+									<li><i class="fa fa-map-marker"></i><span>338 Hai Bà Trưng, Phường Tân định, Quận 1, Tp Hồ Chí Minh</span></li>
+									<li><i class="fa fa-phone"></i><span>0909131418 - 0798531637<span class="line-break">Thứ 2 - Chủ nhật: 7:00 - 21:00</span></span></li>
+									<li><i class="fa fa-envelope"></i><span>hong3ly@gmail.com</span></li>
+								</ul>
+								<ul class="list-menu">
+									<li>Hộ kinh doanh Võ Trần Cương</li>
+									<li>Đại diện Pháp luật: Võ Trần Cương</li>
+									<li>Mã số thuế: 8125704849</li>
+									<li>Giấy ĐKKD số :41A8037733</li>
+									<li>Ngày cấp:13/04/2015</li>
 								</ul>
 							</div>
 						</div>
-						<div class="col-xs-12 col-sm-3 col-md-2 col-lg-2">
-							<div class="footer-widget"><h3>Chính sách</h3>
-								<ul class="list-menu">
-									<li><a href="{{ route('page.shipping.payment') }}">Giao hàng và thanh toán</a></li>
-									<li><a href="{{ route('page.return') }}">Chính sách đổi trả</a></li>
-									<li><a href="{{ route('page.privacy') }}">Chính sách bảo mật</a></li>
-									<li><a href="{{ route('page.privacy.info') }}">Bảo mật thông tin</a></li>
-									<li><a href="{{ route('page.terms') }}">Điều khoản dịch vụ</a></li>
-								</ul>
-							</div>
-						</div>
-						<div class="col-xs-12 col-sm-3 col-md-2 col-lg-2">
-							<div class="footer-widget"><h3>Hỗ trợ</h3>
-								<ul class="list-menu">
-									<li><a href="{{ route('page.frontpage') }}">Trang frontpage</a></li>
-									<li><a href="{{ route('products.index') }}">Tìm kiếm sản phẩm</a></li>
-									<li><a href="{{ route('page.faq') }}">Câu hỏi thường gặp</a></li>
-									<li><a href="{{ route('page.corporate') }}">Khách hàng doanh nghiệp</a></li>
+
+						<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
+							<div class="footer-widget">
+								<h3>Danh mục</h3>
+								<ul class="list-menu menu-dot">
+									<li><a href="{{ route('home') }}">Trang chủ</a></li>
+									<li><a href="{{ route('products.index') }}">Sản phẩm</a></li>
+									<li><a href="{{ route('categories.show', 'mam-dia-ngu-qua') }}">Mâm dĩa ngũ quả</a></li>
 									<li><a href="{{ route('about') }}">Giới thiệu</a></li>
 									<li><a href="{{ route('contact.page') }}">Liên hệ</a></li>
 								</ul>
+								<div class="wrap-bct" style="margin-top:14px;">
+									<a href="http://online.gov.vn/Home/WebDetails/94759" target="_blank" rel="noopener noreferrer">
+										<img src="//theme.hstatic.net/200000157781/1001036201/14/logo_bct.png?v=1064" alt="Bộ Công Thương" style="max-width: 220px; width: 100%;">
+									</a>
+								</div>
 							</div>
 						</div>
-						<div class="col-xs-12 col-sm-6 col-md-4 col-lg-4">
+
+						<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
 							<div class="footer-widget">
-								<h3>Kết nối với chúng tôi</h3>
-								<div class="fb-page" data-href="https://www.facebook.com/thegioitraicay.net" data-small-header="false" data-adapt-container-width="true" data-hide-cover="false" data-show-facepile="true"></div>
+								<h3>Hỗ trợ khách hàng</h3>
+								<ul class="list-menu menu-dot">
+									<li><a href="{{ route('about') }}">Giới thiệu</a></li>
+									<li><a href="{{ route('search') }}">Tìm kiếm</a></li>
+									<li><a href="{{ route('page.faq') }}">Câu hỏi thường gặp</a></li>
+									<li><a href="{{ route('page.shipping.payment') }}">Chính sách giao hàng và thanh toán</a></li>
+									<li><a href="{{ route('page.corporate') }}">Khách hàng doanh nghiệp</a></li>
+									<li><a href="{{ route('page.return') }}">Chính sách đổi trả</a></li>
+									<li><a href="{{ route('page.privacy.info') }}">Chính sách bảo mật thông tin</a></li>
+								</ul>
+							</div>
+						</div>
+
+						<div class="col-xs-12 col-sm-6 col-md-3 col-lg-3">
+							<div class="footer-widget">
+								<h3>Kết nối với thế giới trái cây</h3>
+								<div class="footer-connect">
+									<div class="divider"></div>
+									<a class="connect-label" href="https://www.facebook.com/thegioitraicay.net" target="_blank" rel="noopener noreferrer">Facebook</a>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-		<div class="copyright text-center py-3" style="background:#f5f5f5; border-top:1px solid #eee;">
-			<p class="mb-0">© Bản quyền thuộc về Thế giới trái cây</p>
+
+		<div class="copyright">
+			<div class="container" style="position: relative;">
+				<div class="row">
+					<div class="col-xs-12 col-md-6">
+						<div class="copyright-text">© Bản quyền thuộc về Thế giới trái cây</div>
+					</div>
+					<div class="col-xs-12 col-md-6 hidden-xs">
+						<ul class="list-menu-footer">
+							<li><a href="{{ route('home') }}">Trang chủ</a></li>
+							<li><a href="{{ route('products.index') }}">Sản phẩm</a></li>
+							<li><a href="{{ route('categories.show', 'mam-dia-ngu-qua') }}">Mâm dĩa ngũ quả</a></li>
+							<li><a href="{{ route('about') }}">Giới thiệu</a></li>
+							<li><a href="{{ route('contact.page') }}">Liên hệ</a></li>
+						</ul>
+					</div>
+				</div>
+				<div class="back-to-top" id="backToTop" title="Lên đầu trang">
+					<i class="fa fa-angle-up"></i>
+				</div>
+			</div>
 		</div>
 	</footer>
 
-<!-- Floating Contact Sidebar -->
-	<div class="contact-float-wrapper">
-		<div class="contact-float-item phone">
-			<a href="tel:0909131418" title="Gọi điện">
-				<i class="fa fa-phone"></i>
-			</a>
-		</div>
-		<div class="contact-float-item zalo">
-			<a href="https://zalo.me/0909131418" target="_blank" title="Zalo">
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-				</svg>
-			</a>
-		</div>
-		<div class="contact-float-item email">
-			<a href="https://m.me/thegioitraicay.net" target="_blank" title="Messenger">
-				<i class="fa fa-comment"></i>
-			</a>
-		</div>
-		<div class="contact-float-item shop">
-			<a href="{{ route('home') }}" title="Shop">
-				<i class="fa fa-shopping-bag"></i>
-			</a>
-		</div>
-		<div class="contact-float-item instagram">
-			<a href="https://instagram.com/thegioitraicay.net" target="_blank" title="Instagram">
-				<i class="fa fa-instagram"></i>
-			</a>
-		</div>
-		<div class="contact-float-item tiktok">
-			<a href="https://tiktok.com/@thegioitraicay.net" target="_blank" title="TikTok">
-				<i class="fa fa-music"></i>
-			</a>
-		</div>
-		<div class="contact-float-item location">
-			<a href="{{ route('contact.page') }}" title="Liên hệ">
-				<i class="fa fa-map-marker"></i>
-			</a>
-		</div>
+	<div class="tgc-side-icons hidden-xs hidden-sm">
+		<a class="icon-item phone" href="tel:0909131418" aria-label="phone"><i class="fa fa-phone"></i></a>
+		<a class="icon-item zalo" href="https://zalo.me/0909131418" target="_blank" rel="noopener noreferrer" aria-label="zalo">Zalo</a>
+		<a class="icon-item youtube" href="https://www.youtube.com/channel/UCbP8WRHFrvv06knZzKyf1Ew" target="_blank" rel="noopener noreferrer" aria-label="youtube"><i class="fa fa-youtube"></i></a>
+		<a class="icon-item instagram" href="https://www.instagram.com/thegioitraicay/" target="_blank" rel="noopener noreferrer" aria-label="instagram"><i class="fa fa-instagram"></i></a>
+		<a class="icon-item tiktok" href="https://www.tiktok.com/@thegioitraicay.net" target="_blank" rel="noopener noreferrer" aria-label="tiktok"><i class="fa fa-music"></i></a>
+		<a class="icon-item location" href="{{ route('contact.page') }}" aria-label="location"><i class="fa fa-map-marker"></i></a>
+		<a class="icon-item messenger" href="https://www.facebook.com/messages/t/270232287830" target="_blank" rel="noopener noreferrer" aria-label="messenger"><i class="fa fa-comment"></i></a>
 	</div>
 
 	<script src='//theme.hstatic.net/200000157781/1001036201/14/jquery-2.2.3.min.js?v=1061'></script>
@@ -507,6 +946,46 @@
 			} else {
 				hydrateLazyImages();
 			}
+		})();
+
+		// Footer back-to-top
+		(function() {
+			var backToTop = document.getElementById('backToTop');
+			if (!backToTop) {
+				return;
+			}
+
+			backToTop.addEventListener('click', function() {
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			});
+		})();
+
+		// Show floating quick-actions only after scrolling down.
+		(function() {
+			var sideIcons = document.querySelector('.tgc-side-icons');
+			var backToTop = document.getElementById('backToTop');
+
+			if (!sideIcons && !backToTop) {
+				return;
+			}
+
+			var scrollThreshold = 140;
+
+			function toggleFloatingActions() {
+				var currentScroll = window.pageYOffset || document.documentElement.scrollTop || 0;
+				var isVisible = currentScroll > scrollThreshold;
+
+				if (sideIcons) {
+					sideIcons.classList.toggle('is-visible', isVisible);
+				}
+
+				if (backToTop) {
+					backToTop.classList.toggle('is-visible', isVisible);
+				}
+			}
+
+			toggleFloatingActions();
+			window.addEventListener('scroll', toggleFloatingActions, { passive: true });
 		})();
 	</script>
 	@stack('scripts')
